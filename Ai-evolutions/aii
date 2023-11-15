@@ -1,0 +1,131 @@
+#!/bin/bash
+
+# Install required packages
+sudo apt-get install python3 python3-pip
+pip3 install --user rasa
+
+# Define the chatbot configuration
+cat << EOF > config.yml
+language: en
+pipeline:
+- name: SpacyNLP
+- name: SpacyTokenizer
+- name: CountVectorsFeaturizer
+- name: DIETClassifier
+  epochs: 100
+EOF
+
+# Define the chatbot stories
+cat << EOF > stories.yml
+- story: greet and goodbye
+  steps:
+  - intent: greet
+  - action: utter_greet
+  - intent: goodbye
+  - action: utter_goodbye
+
+- story: ask for time
+  steps:
+  - intent: ask_time
+  - action: action_time
+
+- story: perform calculation
+  steps:
+  - intent: perform_calculation
+  - action: action_calculation
+EOF
+
+# Define the chatbot actions
+cat << EOF > actions.py
+from typing import Any, Text, Dict, List
+
+from rasa_sdk import Action, Tracker
+from rasa_sdk.executor import CollectingDispatcher
+
+class ActionGreet(Action):
+
+    def name(self) -> Text:
+        return "action_greet"
+
+    def run(self, dispatcher: CollectingDispatcher,
+            tracker: Tracker,
+            domain: Dict[Text, Any]) -> List[Dict[Text, Any]]:
+
+        dispatcher.utter_message(text="Hello! How can I assist 
+you today?")
+
+        return []
+
+class ActionGoodbye(Action):
+
+    def name(self) -> Text:
+        return "action_goodbye"
+
+    def run(self, dispatcher: CollectingDispatcher,
+            tracker: Tracker,
+            domain: Dict[Text, Any]) -> List[Dict[Text, Any]]:
+
+        dispatcher.utter_message(text="Goodbye! Have a great 
+day!")
+
+        return []
+
+class ActionTime(Action):
+
+    def name(self) -> Text:
+        return "action_time"
+
+    def run(self, dispatcher: CollectingDispatcher,
+            tracker: Tracker,
+            domain: Dict[Text, Any]) -> List[Dict[Text, Any]]:
+
+        from datetime import datetime
+
+        time_now = datetime.now().strftime("%H:%M:%S")
+
+        dispatcher.utter_message(text=f"The current time is 
+{time_now}")
+
+        return []
+
+class ActionCalculation(Action):
+
+    def name(self) -> Text:
+        return "action_calculation"
+
+    def run(self, dispatcher: CollectingDispatcher,
+            tracker: Tracker,
+            domain: Dict[Text, Any]) -> List[Dict[Text, Any]]:
+
+        import math
+
+        expression = tracker.latest_message['text']
+
+        try:
+            result = eval(expression)
+            if isinstance(result, float):
+                result = round(result, 2)
+            dispatcher.utter_message(text=f"The answer is 
+{result}")
+        except:
+            dispatcher.utter_message(text="I'm sorry, I couldn't 
+perform that calculation.")
+
+        return []
+EOF
+
+# Train the chatbot
+rasa train
+
+# Start the chatbot server
+rasa run --enable-api
+
+# Start the chatbot loop
+echo "Welcome to the Chatbot!"
+while :
+do
+  read -p "> " input
+  response=$(curl -XPOST http://localhost:5005/model/parse -d 
+'{"text": "'"$input"'"}' | jq -r .text)
+  echo "$response"
+done
