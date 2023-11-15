@@ -1,0 +1,53 @@
+#!/bin/bash
+
+# Define the functions for the AI
+function chat() {
+  # Use the Wolfram Alpha API to get an answer to the question
+  result=$(curl -s 
+"http://api.wolframalpha.com/v2/query?appid=YOUR_APP_ID&input=$1&format=plaintext" 
+| grep -o "<plaintext>.*</plaintext>" | sed -e "s/<plaintext>//g" 
+-e "s/<\/plaintext>//g")
+
+  # If there is no answer from the API, use a fallback message
+  if [[ -z $result ]]; then
+    echo "I'm sorry, I don't know the answer to that. Can you ask 
+me something else?"
+  else
+    echo $result
+  fi
+}
+
+function play_song() {
+  # Use the Spotify API to play a song
+  result=$(curl -X "POST" -H "Authorization: Bearer 
+YOUR_ACCESS_TOKEN" "https://api.spotify.com/v1/me/player/play" 
+--data '{"uris": ["spotify:track:'"$1"'"]}')
+
+  # Check if the song was successfully played
+  if [[ $result == *"No active device found"* ]]; then
+    echo "I'm sorry, I couldn't play the song. Please make sure 
+your device is connected to Spotify."
+  else
+    echo "Playing song..."
+  fi
+}
+
+# Start the main loop
+echo "Welcome to the AI program!"
+while true
+do
+  # Get user input
+  read -p "> " input
+
+  # Perform actions based on user input
+  if [[ $input == "exit" ]]; then
+    echo "Goodbye!"
+    exit
+  elif [[ $input == "play song "* ]]; then
+    song_id=${input#*"play song "}
+    play_song $song_id
+  else
+    chat $input
+  fi
+done
+
